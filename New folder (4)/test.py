@@ -10,16 +10,7 @@ bot = telebot.TeleBot("5158250787:AAEsI0d4pcgwyf6EMM2TpcDt548ADA9seOM")
 
 # Define a prompt template
 PROMPT_TEMPLATE = (
-    "Sen bir Newport sirketinin musteri hizmetlerinde calissiyorsun ve ona gore cevap vereceksin. "
-    "Yazılarını selam yakı merhaba ile başlamana gerek yok ve müşteri hangi dil ile yazdıysa o dil ile cevap ver, "
-    "cevaplar arasında uygun emojiler kullan. "
-    "Newport şirketi Özbekistan'daki Newport rezidansın adıdır. Biz burada insanlara Newport rezidansdaki evleri anlatırız. "
-    "Her seferinde kendini tanıtmana gerek yok yani Newport rezidans diye başlama, sadece ilk mesajlarda yaz. "
-    "Dosya bilgisi: {file_content} (ev sayısı ne kadar az ise o kadar çok satılan blok oluyor). "
-    "Müşterilere data hakkında fazla veri verme, sadece soruya cevap ver ve kalan ev veya satılan evler hakkında bilgi verme. "
-    "Ne olursa olsun kaç adet ev kaldı sorusuna cevap verme. "
-    "Kullanıcı fotoğraf isterse: {photo_file}. "
-    "Kullanıcı sorusu: {user_input}"
+    "cevapla : {user_input}"
 )
 
 # Read the content of the CSV file
@@ -45,18 +36,33 @@ FILE_PATH = "info.csv"
 file_content = read_csv(FILE_PATH)
 photo_file_path = "info.png"
 
+# Dictionary to store user conversation history
+user_history = {}
+
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
+    user_id = message.chat.id
+    user_input = message.text
+
     # Log the received message
-    print(f"Received message: {message.text}")
-    
-    # Format the prompt with the user's input and file content
+    print(f"Received message from {user_id}: {user_input}")
+
+    # Initialize or update the user's conversation history
+    if user_id not in user_history:
+        user_history[user_id] = []
+    user_history[user_id].append(user_input)
+
+    # Format the conversation history as a string
+    conversation_history = "\n".join(user_history[user_id])
+
+    # Format the prompt with the user's input, file content, and conversation history
     prompt = PROMPT_TEMPLATE.format(
         file_content=file_content,
         photo_file=photo_file_path,
-        user_input=message.text
+        user_input=user_input,
+        conversation_history=conversation_history
     )
-    
+
     try:
         # Generate a response using the AI model
         response = client.models.generate_content(
@@ -70,10 +76,10 @@ def handle_message(message):
         bot.reply_to(message, "Üzgünüm, bir hata oluştu.")
 
     # Check if the user requested a photo
-    if "fotoğraf" in message.text.lower() or "resim" in message.text.lower():
+    if "fotoğraf" in user_input.lower() or "resim" in user_input.lower():
         photo = open_photo(photo_file_path)
         if photo:
-            bot.send_photo(message.chat.id, photo)
+            bot.send_photo(user_id, photo)
             photo.close()
         else:
             bot.reply_to(message, "Üzgünüm, fotoğraf bulunamadı.")
